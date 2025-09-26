@@ -10,6 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 from scipy.stats import ttest_rel
 import logging
+import mlflow
+import mlflow.sklearn
 try:
     from tqdm.auto import tqdm
 except Exception:  # pragma: no cover
@@ -187,6 +189,16 @@ def main():
     logger.addHandler(ch)
     logger.addHandler(fh)
 
+    # MLflow setup (env-aware). Use server if MLFLOW_TRACKING_URI is set; otherwise local file store
+    tracking = os.getenv("MLFLOW_TRACKING_URI")
+    if tracking:
+        mlflow.set_tracking_uri(tracking)
+    else:
+        mlruns_dir = os.path.join(P3_DIR, 'mlruns')
+        os.makedirs(mlruns_dir, exist_ok=True)
+        mlflow.set_tracking_uri(f"file://{mlruns_dir}")
+    mlflow.set_experiment("AirQuality-NOx-6h")
+
     logger.info('Starting LR training (h=6)')
     logger.info(f'CSV: {args.csv}')
     logger.info(f'Artifacts dir: {args.artifacts}')
@@ -338,16 +350,43 @@ def main():
         'data_summary': data_summary
     }
 
-    # Save artifacts
+    # Save artifacts and log to MLflow
     import joblib
-    # Organize artifacts in fixed LR folder, regardless of selected algo
-    joblib.dump(final_model, os.path.join(model_dir, 'model.pkl'))
-    joblib.dump(scaler_final, os.path.join(model_dir, 'scaler.pkl'))
-    with open(os.path.join(model_dir, 'features.json'), 'w') as f:
-        json.dump({'features': X_train.columns.tolist(), 'selected_algo': best['algo'], 'selected_alpha': best['alpha']}, f, indent=2)
-    with open(os.path.join(model_dir, 'metrics.json'), 'w') as f:
-        json.dump(metrics, f, indent=2)
-    logger.info('Artifacts saved (model, scaler, features, metrics, log).')
+    features_list = X_train.columns.tolist()
+    with mlflow.start_run(run_name=f"LR-{best['algo']}"):
+        # Params
+        mlflow.log_param('algorithm', best['algo'])
+        if best['alpha'] is not None:
+            mlflow.log_param('alpha', best['alpha'])
+        mlflow.log_param('horizon_h', 6)
+        mlflow.log_param('feature_count', int(X_train.shape[1]))
+
+        # Metrics
+        for split in ['val', 'test']:
+            for k, v in metrics[split].items():
+                if isinstance(v, dict):
+                    # log nested significance test metrics with prefix
+                    for kk, vv in v.items():
+                        mlflow.log_metric(f"{split}_{k}_{kk}", float(vv) if vv is not None else 0.0)
+                elif v is not None:
+                    mlflow.log_metric(f"{split}_{k}", float(v))
+
+        # Persist artifacts locally
+        joblib.dump(final_model, os.path.join(model_dir, 'model.pkl'))
+        joblib.dump(scaler_final, os.path.join(model_dir, 'scaler.pkl'))
+        with open(os.path.join(model_dir, 'features.json'), 'w') as f:
+            json.dump({'features': features_list, 'selected_algo': best['algo'], 'selected_alpha': best['alpha']}, f, indent=2)
+        with open(os.path.join(model_dir, 'metrics.json'), 'w') as f:
+            json.dump(metrics, f, indent=2)
+
+        # Log artifacts to MLflow
+        mlflow.log_artifacts(model_dir, artifact_path='lr')
+
+        # Log the selected model in MLflow format for registry compatibility
+        mlflow.sklearn.log_model(final_model, artifact_path='model')
+        mlflow.log_text(json.dumps({'features': features_list}, indent=2), artifact_file='features.json')
+
+    logger.info('Artifacts saved and logged to MLflow (model, scaler, features, metrics, log).')
 
     print(json.dumps(metrics, indent=2))
 

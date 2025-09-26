@@ -279,6 +279,75 @@ This project is developed for educational purposes as part of an academic assign
 
 This project was developed with assistance from Claude AI to ensure technical accuracy, comprehensive analysis, and professional presentation. The implementation reflects the integration of streaming technologies with predictive analytics for environmental applications.
 
+## MLflow Tracking (Phase 3)
+
+- Training scripts now log to MLflow under `phase_3_predictive_analytics/mlruns` using experiment name `AirQuality-NOx-6h`.
+- To view runs locally:
+
+```bash
+cd phase_3_predictive_analytics
+mlflow ui --backend-store-uri file://$PWD/mlruns --host 127.0.0.1 --port 5000
+```
+
+- Each run records:
+  - Parameters: algorithm/config, feature count, horizon
+  - Metrics: validation and test metrics (MAE, RMSE, R², sMAPE), significance tests
+  - Artifacts: model binaries, features.json, metrics.json (under per-model subfolders)
+
+### Auto-register best model (optional)
+- Requires MLflow server with DB backend (registry not supported on file:// stores)
+- Enable auto-registration during training:
+
+```bash
+export MLFLOW_TRACKING_URI=http://127.0.0.1:5000
+export REGISTER_BEST=1
+cd phase_3_predictive_analytics
+python train.py
+```
+
+- Behavior: selects the best run in experiment `AirQuality-NOx-6h` by lowest `test_rmse`, registers it as `AirQualityNOx6h`, and promotes to Production (archiving previous versions).
+
+### Recommended local setup with env vars
+
+1) Start MLflow server with registry (SQLite) in Phase 3 dir:
+```bash
+cd phase_3_predictive_analytics
+mlflow server --backend-store-uri sqlite:///mlflow.db \
+  --default-artifact-root file://$PWD/mlruns_artifacts \
+  --host 127.0.0.1 --port 5000
+```
+
+2) Export env vars (current shell):
+```bash
+export MLFLOW_TRACKING_URI=http://127.0.0.1:5000
+export REGISTER_BEST=1
+export MODEL_NAME=AirQualityNOx6h
+```
+
+3) Train and auto-register:
+```bash
+cd phase_3_predictive_analytics
+python train.py
+```
+
+4) View UI: http://127.0.0.1:5000
+
+### Using a .env file (optional)
+
+Create `phase_3_predictive_analytics/.env`:
+```bash
+MLFLOW_TRACKING_URI=http://127.0.0.1:5000
+REGISTER_BEST=1
+MODEL_NAME=AirQualityNOx6h
+```
+
+Load and run:
+```bash
+cd phase_3_predictive_analytics
+set -a; source .env; set +a
+python train.py
+```
+
 ---
 
 **Author**: Santiago Bolaños Vega  

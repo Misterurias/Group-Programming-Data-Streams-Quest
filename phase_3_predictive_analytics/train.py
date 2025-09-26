@@ -8,6 +8,16 @@ import os
 import sys
 import subprocess
 import logging
+import json
+import urllib.parse
+from typing import Optional
+
+try:
+    import mlflow
+    from mlflow.tracking import MlflowClient
+except Exception:
+    mlflow = None  # type: ignore
+    MlflowClient = None  # type: ignore
 
 # Set up logging
 logging.basicConfig(
@@ -94,10 +104,71 @@ def main():
     
     if successful == len(results):
         logger.info("🎉 All models trained successfully!")
-        return 0
+        exit_code = 0
     else:
         logger.warning("⚠️  Some models failed to train. Check logs above.")
-        return 1
+        exit_code = 1
+
+    # Optional: Auto-register best model to MLflow Model Registry
+    try:
+        if os.getenv("REGISTER_BEST", "0") != "1":
+            logger.info("Model auto-registration disabled (set REGISTER_BEST=1 to enable).")
+            return exit_code
+
+        if mlflow is None or MlflowClient is None:
+            logger.warning("MLflow not available; cannot perform auto-registration.")
+            return exit_code
+
+        tracking_uri = mlflow.get_tracking_uri()
+        logger.info(f"MLflow tracking URI: {tracking_uri}")
+
+        # Skip if file:// store (no registry support)
+        if tracking_uri and tracking_uri.startswith("file:"):
+            logger.warning("Registry requires an MLflow server with DB backend. Skipping registration for file:// store.")
+            return exit_code
+
+        client = MlflowClient()
+        exp = client.get_experiment_by_name("AirQuality-NOx-6h")
+        if exp is None:
+            logger.warning("Experiment 'AirQuality-NOx-6h' not found. Skipping registration.")
+            return exit_code
+
+        # Find best run by lowest test_rmse
+        runs = client.search_runs(
+            experiment_ids=[exp.experiment_id],
+            filter_string="attributes.status = 'FINISHED' and metrics.test_rmse > 0",
+            order_by=["metrics.test_rmse ASC"],
+            max_results=50,
+        )
+        if not runs:
+            logger.warning("No finished runs with test_rmse found. Skipping registration.")
+            return exit_code
+
+        best = runs[0]
+        best_run_id = best.info.run_id
+        best_rmse = best.data.metrics.get("test_rmse", float("inf"))
+        algo = best.data.params.get("algorithm", "unknown")
+        logger.info(f"Best run: {best_run_id} algo={algo} test_rmse={best_rmse:.3f}")
+
+        model_name = os.getenv("MODEL_NAME", "AirQualityNOx6h")
+        model_uri = f"runs:/{best_run_id}/model"
+
+        logger.info(f"Registering model: name={model_name}, uri={model_uri}")
+        registered = mlflow.register_model(model_uri=model_uri, name=model_name)
+
+        # Promote to Production
+        client.transition_model_version_stage(
+            name=model_name,
+            version=registered.version,
+            stage="Production",
+            archive_existing_versions=True,
+        )
+        logger.info(f"Promoted {model_name} v{registered.version} to Production")
+
+    except Exception as e:
+        logger.warning(f"Auto-registration skipped due to error: {e}")
+
+    return exit_code
 
 if __name__ == "__main__":
     exit_code = main()

@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/santiagbv/Documents/operationalizing-ai-docs/Group-Programming-Data-Streams-Quest/phase_3_predictive_analytics/mlruns/312777479238662373/3080ca79aab74cf481258cb6b1cda806/artifacts
+end_time: 1758898891477
+entry_point_name: ''
+experiment_id: '312777479238662373'
+lifecycle_stage: active
+run_id: 3080ca79aab74cf481258cb6b1cda806
+run_name: SARIMA
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1758898889803
+status: 3
+tags: []
+user_id: santiagbv

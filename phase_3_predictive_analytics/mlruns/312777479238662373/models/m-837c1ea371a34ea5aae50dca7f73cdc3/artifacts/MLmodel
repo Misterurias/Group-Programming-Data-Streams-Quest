@@ -1,0 +1,22 @@
+artifact_path: file:///Users/santiagbv/Documents/operationalizing-ai-docs/Group-Programming-Data-Streams-Quest/phase_3_predictive_analytics/mlruns/312777479238662373/models/m-837c1ea371a34ea5aae50dca7f73cdc3/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.11.11
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.7.2
+mlflow_version: 3.4.0
+model_id: m-837c1ea371a34ea5aae50dca7f73cdc3
+model_size_bytes: 536
+model_uuid: m-837c1ea371a34ea5aae50dca7f73cdc3
+prompts: null
+run_id: 64e4aa25907a47a4b2e4f21a90a2ca5f
+utc_time_created: '2025-09-26 15:09:25.250353'

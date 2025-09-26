@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/santiagbv/Documents/operationalizing-ai-docs/Group-Programming-Data-Streams-Quest/phase_3_predictive_analytics/mlruns/312777479238662373/2746c89b5727474b83aec8e386ed886e/artifacts
+end_time: 1758898897254
+entry_point_name: ''
+experiment_id: '312777479238662373'
+lifecycle_stage: active
+run_id: 2746c89b5727474b83aec8e386ed886e
+run_name: XGBoost
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1758898895247
+status: 3
+tags: []
+user_id: santiagbv

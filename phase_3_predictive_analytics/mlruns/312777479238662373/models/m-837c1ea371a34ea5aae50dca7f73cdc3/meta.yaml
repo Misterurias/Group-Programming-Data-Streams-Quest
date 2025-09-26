@@ -1,0 +1,10 @@
+artifact_location: file:///Users/santiagbv/Documents/operationalizing-ai-docs/Group-Programming-Data-Streams-Quest/phase_3_predictive_analytics/mlruns/312777479238662373/models/m-837c1ea371a34ea5aae50dca7f73cdc3/artifacts
+creation_timestamp: 1758899365235
+experiment_id: '312777479238662373'
+last_updated_timestamp: 1758899367332
+model_id: m-837c1ea371a34ea5aae50dca7f73cdc3
+model_type: null
+name: model
+source_run_id: 64e4aa25907a47a4b2e4f21a90a2ca5f
+status: 2
+status_message: null

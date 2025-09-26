@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/santiagbv/Documents/operationalizing-ai-docs/Group-Programming-Data-Streams-Quest/phase_3_predictive_analytics/mlruns/312777479238662373/64e4aa25907a47a4b2e4f21a90a2ca5f/artifacts
+end_time: 1758899367334
+entry_point_name: ''
+experiment_id: '312777479238662373'
+lifecycle_stage: active
+run_id: 64e4aa25907a47a4b2e4f21a90a2ca5f
+run_name: LR-ridge
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1758899365187
+status: 3
+tags: []
+user_id: santiagbv

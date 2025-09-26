@@ -1,0 +1,22 @@
+artifact_path: file:///Users/santiagbv/Documents/operationalizing-ai-docs/Group-Programming-Data-Streams-Quest/phase_3_predictive_analytics/mlruns_artifacts/1/models/m-3d38ede0b371405bb76abe13fa7b0d2f/artifacts
+flavors:
+  python_function:
+    data: model.xgb
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.11.11
+  xgboost:
+    code: null
+    data: model.xgb
+    model_class: xgboost.sklearn.XGBRegressor
+    model_format: xgb
+    xgb_version: 3.0.5
+mlflow_version: 3.4.0
+model_id: m-3d38ede0b371405bb76abe13fa7b0d2f
+model_size_bytes: 330269
+model_uuid: m-3d38ede0b371405bb76abe13fa7b0d2f
+prompts: null
+run_id: f40d590ade324197806c2115e7840665
+utc_time_created: '2025-09-26 15:23:09.905142'

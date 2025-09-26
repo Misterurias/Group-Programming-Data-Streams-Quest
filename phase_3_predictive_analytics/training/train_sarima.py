@@ -9,6 +9,8 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.metrics import r2_score
 from scipy.stats import ttest_rel
 import logging
+import mlflow
+import mlflow.pyfunc
 try:
     from tqdm.auto import tqdm
 except Exception:  # pragma: no cover
@@ -141,6 +143,16 @@ def main():
     logger.addHandler(ch)
     logger.addHandler(fh)
 
+    # MLflow setup (env-aware)
+    tracking = os.getenv("MLFLOW_TRACKING_URI")
+    if tracking:
+        mlflow.set_tracking_uri(tracking)
+    else:
+        mlruns_dir = os.path.join(P3_DIR, 'mlruns')
+        os.makedirs(mlruns_dir, exist_ok=True)
+        mlflow.set_tracking_uri(f"file://{mlruns_dir}")
+    mlflow.set_experiment("AirQuality-NOx-6h")
+
     logger.info('Starting SARIMA training (h=6)')
     logger.info(f'CSV: {args.csv}')
     logger.info(f'Artifacts dir: {args.artifacts}')
@@ -261,7 +273,29 @@ def main():
         json.dump(metrics['model'], f, indent=2)
     with open(os.path.join(model_dir, 'metrics.json'), 'w') as f:
         json.dump(metrics, f, indent=2)
-    logger.info('Artifacts saved (model, config, metrics, log).')
+
+    # Log to MLflow
+    with mlflow.start_run(run_name="SARIMA"):
+        # Params
+        mlflow.log_param('algorithm', 'sarima')
+        mlflow.log_param('order', metrics['model']['order'])
+        mlflow.log_param('seasonal_order', metrics['model']['seasonal_order'])
+        mlflow.log_param('horizon_h', 6)
+        mlflow.log_param('seasonal_period', 24)
+
+        # Metrics
+        mlflow.log_metric('val_rmse', float(best['val_rmse']))
+        for k, v in metrics['test'].items():
+            if isinstance(v, dict):
+                for kk, vv in v.items():
+                    mlflow.log_metric(f"test_{k}_{kk}", float(vv) if vv is not None else 0.0)
+            elif v is not None:
+                mlflow.log_metric(f"test_{k}", float(v))
+
+        # Artifacts
+        mlflow.log_artifacts(model_dir, artifact_path='sarima')
+
+    logger.info('Artifacts saved and logged to MLflow (model, config, metrics).')
 
     print(json.dumps(metrics, indent=2))
 

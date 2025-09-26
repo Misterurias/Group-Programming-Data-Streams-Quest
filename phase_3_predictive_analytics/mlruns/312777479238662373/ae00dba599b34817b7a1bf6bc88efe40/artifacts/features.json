@@ -1,0 +1,16 @@
+{
+  "features": [
+    "nox_lag1",
+    "nox_lag3",
+    "nox_lag6",
+    "nox_lag12",
+    "nox_lag18",
+    "nox_lag24",
+    "nox_lag48",
+    "nox_mean_24h",
+    "co_lag1",
+    "no2_lag1",
+    "sin_hour",
+    "cos_hour"
+  ]
+}

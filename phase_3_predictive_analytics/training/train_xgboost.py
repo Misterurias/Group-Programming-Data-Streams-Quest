@@ -10,6 +10,8 @@ from scipy.stats import ttest_rel
 import logging
 import joblib
 import xgboost as xgb
+import mlflow
+import mlflow.xgboost
 try:
     from tqdm.auto import tqdm
 except Exception:
@@ -140,6 +142,16 @@ def main():
     ch.setFormatter(fmt); fh.setFormatter(fmt)
     logger.addHandler(ch); logger.addHandler(fh)
 
+    # MLflow setup (env-aware)
+    tracking = os.getenv("MLFLOW_TRACKING_URI")
+    if tracking:
+        mlflow.set_tracking_uri(tracking)
+    else:
+        mlruns_dir = os.path.join(P3_DIR, 'mlruns')
+        os.makedirs(mlruns_dir, exist_ok=True)
+        mlflow.set_tracking_uri(f"file://{mlruns_dir}")
+    mlflow.set_experiment("AirQuality-NOx-6h")
+
     logger.info("Starting XGBoost training (h=6)")
     df = load_csv(args.csv)
     train_df, val_df, test_df = chronological_split(df)
@@ -219,13 +231,35 @@ def main():
         }
     }
 
-    # Save artifacts
+    # Save artifacts and log to MLflow
     joblib.dump(final_model, os.path.join(model_dir, "model.pkl"))
     with open(os.path.join(model_dir, "features.json"), "w") as f:
         json.dump({"features": X_train.columns.tolist(), "params": best["params"]}, f, indent=2)
     with open(os.path.join(model_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=2)
-    logger.info("Artifacts saved for XGB (model, features, metrics).")
+
+    with mlflow.start_run(run_name="XGBoost"):
+        # Params
+        mlflow.log_param('algorithm', 'xgboost')
+        for k, v in best['params'].items():
+            mlflow.log_param(k, v)
+        mlflow.log_param('horizon_h', 6)
+        mlflow.log_param('feature_count', int(X_train.shape[1]))
+
+        # Metrics
+        for split in ['val', 'test']:
+            for k, v in metrics[split].items():
+                if isinstance(v, dict):
+                    for kk, vv in v.items():
+                        mlflow.log_metric(f"{split}_{k}_{kk}", float(vv) if vv is not None else 0.0)
+                elif v is not None:
+                    mlflow.log_metric(f"{split}_{k}", float(v))
+
+        # Artifacts
+        mlflow.log_artifacts(model_dir, artifact_path='xgb')
+        mlflow.xgboost.log_model(final_model, artifact_path='model')
+
+    logger.info("Artifacts saved and logged to MLflow for XGB (model, features, metrics).")
 
     print(json.dumps(metrics, indent=2))
 

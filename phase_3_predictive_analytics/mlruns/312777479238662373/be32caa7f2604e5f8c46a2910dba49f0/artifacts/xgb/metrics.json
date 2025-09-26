@@ -1,0 +1,59 @@
+{
+  "val": {
+    "mae": 127.70574533031235,
+    "rmse": 175.61252142650926,
+    "r2": 0.376520605845552,
+    "smape": 38.226321863324856,
+    "mae_baseline": 187.9343866047068,
+    "rmse_baseline": 224.95849939102916,
+    "significance_test": {
+      "t_statistic": 16.442380555880174,
+      "p_value": 1.0971460327782959e-55,
+      "significant": 1,
+      "n_samples": 1403
+    }
+  },
+  "test": {
+    "mae": 104.6545868326399,
+    "rmse": 140.17540970622133,
+    "r2": 0.4054635784807723,
+    "smape": 36.51418203781943,
+    "mae_baseline": 318.38596507300025,
+    "rmse_baseline": 348.8702110880399,
+    "significance_test": {
+      "t_statistic": 42.82057151216009,
+      "p_value": 1.1978805950803362e-256,
+      "significant": 1,
+      "n_samples": 1399
+    }
+  },
+  "features": [
+    "nox_lag1",
+    "nox_lag3",
+    "nox_lag6",
+    "nox_lag12",
+    "nox_lag18",
+    "nox_lag24",
+    "nox_lag48",
+    "nox_mean_24h",
+    "co_lag1",
+    "no2_lag1",
+    "sin_hour",
+    "cos_hour"
+  ],
+  "data_summary": {
+    "target": "nox_gt",
+    "horizon_h": 6,
+    "features": 12,
+    "rows_after_feature_build": 9303,
+    "train": {
+      "rows": 6501
+    },
+    "validation": {
+      "rows": 1403
+    },
+    "test": {
+      "rows": 1399
+    }
+  }
+}
