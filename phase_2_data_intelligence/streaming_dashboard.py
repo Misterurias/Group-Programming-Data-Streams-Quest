@@ -32,10 +32,10 @@ _PROJECT_ROOT = os.path.dirname(_CURRENT_DIR)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 try:
-    from phase_3_predictive_analytics.predictors import predict_lr_next_6, predict_sarima_next_6
+    from phase_3_predictive_analytics.predictors import predict_lr_next_6, predict_sarima_next_6, predict_xgb_next_6
 except ModuleNotFoundError:
     # Fallback to relative import if package-style import fails
-    from ..phase_3_predictive_analytics.predictors import predict_lr_next_6, predict_sarima_next_6  # type: ignore
+    from ..phase_3_predictive_analytics.predictors import predict_lr_next_6, predict_sarima_next_6, predict_xgb_next_6  # type: ignore
 
 # Import analytics module from same directory
 from streaming_analytics import StreamingAnalytics
@@ -1223,17 +1223,21 @@ def main():
             models_dir = os.path.join(_PROJECT_ROOT, "phase_3_predictive_analytics", "models")
             lr_df = pd.DataFrame()
             sar_df = pd.DataFrame()
+            xgb_df = pd.DataFrame()
             lr_model_path = os.path.join(models_dir, "lr", "model.pkl")
             sar_model_path = os.path.join(models_dir, "sarima", "model.pkl")
+            xgb_model_path = os.path.join(models_dir, "xgb", "model.pkl")
+
             
             # Load model metrics
             lr_metrics_path = os.path.join(models_dir, "lr", "metrics.json")
             sar_metrics_path = os.path.join(models_dir, "sarima", "metrics.json")
+            xgb_metrics_path = os.path.join(models_dir, "xgb", "metrics.json")
             
             # Display model performance metrics
             st.subheader("Model Performance Metrics")
-            col1, col2 = st.columns(2)
-            
+            col1, col2, col3 = st.columns(3)
+
             with col1:
                 st.markdown("**Linear Regression Model**")
                 if os.path.exists(lr_metrics_path):
@@ -1306,6 +1310,41 @@ def main():
                 else:
                     st.info("SARIMA metrics not available")
             
+            with col3:
+                st.markdown("**XGBoost Model**")
+                if os.path.exists(xgb_metrics_path):
+                    try:
+                        import json
+                        with open(xgb_metrics_path, 'r') as f:
+                            xgb_metrics = json.load(f)
+                        
+                        test_metrics = xgb_metrics.get('test', {})
+                        baseline_metrics = xgb_metrics.get('test', {})
+                        
+                        st.metric("MAE", f"{test_metrics.get('mae', 0):.1f}", 
+                                delta=f"{baseline_metrics.get('mae_baseline', 0) - test_metrics.get('mae', 0):.1f} improvement")
+                        st.metric("RMSE", f"{test_metrics.get('rmse', 0):.1f}", 
+                                delta=f"{baseline_metrics.get('rmse_baseline', 0) - test_metrics.get('rmse', 0):.1f} improvement")
+                        st.metric("R²", f"{test_metrics.get('r2', 0):.3f}")
+                        st.metric("sMAPE", f"{test_metrics.get('smape', 0):.1f}%")
+                        
+                        # Statistical significance
+                        sig_test = test_metrics.get('significance_test', {})
+                        if sig_test and 'significant' in sig_test:
+                            significance_text = "✅ Significant" if sig_test['significant'] == 1 else "❌ Not significant"
+                            p_value = sig_test.get('p_value', 0)
+                            st.metric("Statistical Significance", significance_text, 
+                                    delta=f"p={p_value:.4f}")
+                        
+                        # Model info
+                        data_summary = xgb_metrics.get('data_summary', {})
+                        st.caption(f"Features: {data_summary.get('features', 0)} | Test samples: {data_summary.get('test', {}).get('rows', 0)}")
+                        
+                    except Exception as e:
+                        st.error(f"Failed to load XGB metrics: {e}")
+                else:
+                    st.info("XGB metrics not available")
+            
             st.markdown("---")
 
             # Generate predictions with safeguards
@@ -1325,7 +1364,15 @@ def main():
             except Exception as e:
                 st.warning(f"SARIMA forecast failed: {e}")
 
-            if (lr_df is None or lr_df.empty) and (sar_df is None or sar_df.empty):
+            try:
+                if os.path.exists(xgb_model_path):
+                    xgb_df = predict_xgb_next_6(df_filtered, models_dir)
+                else:
+                    st.info("XGB model not found. Train it first to enable XGB forecasts.")
+            except Exception as e:
+                st.warning(f"XGB forecast failed: {e}")
+
+            if (lr_df is None or lr_df.empty) and (sar_df is None or sar_df.empty) and (xgb_df is None or xgb_df.empty):
                 st.info("Forecast models not found or insufficient history to predict.")
             else:
                 # Plot recent NOx plus forecasts
@@ -1345,6 +1392,16 @@ def main():
                     fig.add_trace(go.Scatter(x=sar_df['datetime'], y=sar_df['sarima_lo'], mode='lines', name='PI low', line=dict(color='rgba(0,0,0,0.3)', dash='dot'), showlegend=False))
                     fig.add_trace(go.Scatter(x=sar_df['datetime'], y=sar_df['sarima_hi'], mode='lines', name='PI high', line=dict(color='rgba(0,0,0,0.3)', dash='dot'), fill='tonexty', fillcolor='rgba(0,0,0,0.08)', showlegend=False))
 
+                if xgb_df is not None and not xgb_df.empty:
+                    fig.add_trace(go.Scatter(
+                        x=xgb_df['datetime'],
+                        y=xgb_df['xgb_pred'],
+                        mode='lines+markers',
+                        name='XGBoost',
+                        line=dict(color='#1f77b4', dash='dashdot')  # choose a distinct style
+                    ))
+
+
                 fig.update_layout(title="NOx Forecasts for Next 6 Hours", xaxis_title="Time", yaxis_title="NOx", height=400)
                 st.plotly_chart(fig, width='stretch', key="forecasts_chart")
 
@@ -1358,6 +1415,11 @@ def main():
                         table = sar_df.copy()
                     else:
                         table = table.merge(sar_df, on='datetime', how='outer')
+                if xgb_df is not None and not xgb_df.empty:
+                    if table.empty:
+                        table = xgb_df.copy()
+                    else:
+                        table = table.merge(xgb_df, on='datetime', how='outer')
                 if not table.empty:
                     st.dataframe(table, width='stretch')
                 else:
