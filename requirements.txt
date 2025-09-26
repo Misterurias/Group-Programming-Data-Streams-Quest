@@ -1,0 +1,19 @@
+# Core Phase 1 Dependencies
+kafka-python==2.2.15
+pandas
+numpy
+matplotlib==3.10.6
+
+# Phase 2 Analytics Dependencies
+streamlit
+plotly
+seaborn
+statsmodels
+
+# Additional Utilities
+scikit-learn
+scipy
+joblib
+python-dateutil
+pytz
+xgboost
