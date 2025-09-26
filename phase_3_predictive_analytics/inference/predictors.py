@@ -101,3 +101,24 @@ def predict_sarima_next_6(df_filtered: pd.DataFrame, models_dir: str) -> pd.Data
     return out
 
 
+def predict_xgb_next_6(df_filtered: pd.DataFrame, models_dir: str) -> pd.DataFrame:
+    """Predict next 6 hours with XGBoost. Returns dataframe with columns: datetime, xgb_pred."""
+    xgb_dir = os.path.join(models_dir, 'xgb')
+    model = joblib.load(os.path.join(xgb_dir, 'model.pkl'))
+    with open(os.path.join(xgb_dir, 'features.json')) as f:
+        feats = json.load(f)['features']
+
+    x_row, t = _build_minimal_features_for_inference(df_filtered)
+    if x_row.empty or pd.isna(t):
+        return pd.DataFrame()
+
+    # Direct prediction using features
+    y_hat = float(model.predict(x_row[feats])[0])
+
+    # For now: simple horizon approach like LR’s version
+    future_times = pd.date_range(start=t + pd.Timedelta(hours=1), periods=6, freq='h')
+    preds = pd.DataFrame({
+        'datetime': future_times,
+        'xgb_pred': [np.nan]*5 + [y_hat]
+    })
+    return preds

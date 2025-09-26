@@ -215,4 +215,99 @@ def predict_sarima_next_6(df_filtered: pd.DataFrame, models_dir: str) -> pd.Data
         logger.error(f"SARIMA prediction error - {str(e)}, time: {execution_time:.3f}s")
         return pd.DataFrame()
 
+def predict_xgb_next_6(df_filtered: pd.DataFrame, models_dir: str) -> pd.DataFrame:
+    """Predict next 6 hours with XGBoost. Returns dataframe with: datetime, xgb_pred."""
+    start_time = time.time()
+    logger.info(f"XGB prediction request - Input rows: {len(df_filtered)}")
+
+    try:
+        # Load model artifacts
+        xgb_dir = os.path.join(models_dir, 'xgb')
+        model_path = os.path.join(xgb_dir, 'model.pkl')
+        features_path = os.path.join(xgb_dir, 'features.json')
+
+        if not all(os.path.exists(p) for p in [model_path, features_path]):
+            logger.warning(f"XGB model files missing - {model_path}")
+            return pd.DataFrame()
+
+        model = joblib.load(model_path)
+        with open(features_path) as f:
+            feats = json.load(f)['features']
+
+        logger.info(f"XGB model loaded successfully from {model_path}")
+
+        # Prepare working frame (same preprocessing as training)
+        d = df_filtered.copy()
+        if 'datetime' not in d.columns:
+            d['datetime'] = pd.to_datetime(d['timestamp'], errors='coerce')
+        d = d.sort_values('datetime')
+        d = d.set_index('datetime').asfreq('h')
+
+        for col in ['nox_gt', 'co_gt', 'no2_gt']:
+            if col in d.columns:
+                d[col] = pd.to_numeric(d[col], errors='coerce')
+        d[['nox_gt','co_gt','no2_gt']] = d[['nox_gt','co_gt','no2_gt']].interpolate(method='time', limit=3)
+
+        hours = d.index.hour
+        for col in ['nox_gt', 'co_gt', 'no2_gt']:
+            if col in d.columns:
+                s = d[col]
+                mean_by_hour = s.groupby(hours).transform('mean')
+                std_by_hour = s.groupby(hours).transform('std')
+                k = 1.5
+                seasonal_fill = mean_by_hour.clip(lower=mean_by_hour - k * std_by_hour,
+                                                  upper=mean_by_hour + k * std_by_hour)
+                d[col] = s.where(s.notna(), seasonal_fill).fillna(s.median())
+
+        last_time = d.index.max()
+        if pd.isna(last_time):
+            logger.error("XGB prediction failed - No valid timestamps in dataset")
+            return pd.DataFrame()
+
+        # Build full feature frame once
+        dd = d.copy()
+        lags = [1, 3, 6, 12, 18, 24, 48]
+        for L in lags:
+            dd[f'nox_lag{L}'] = dd['nox_gt'].shift(L)
+        dd['nox_mean_24h'] = dd['nox_gt'].shift(1).rolling(window=24, min_periods=6).mean()
+        dd['co_lag1'] = dd['co_gt'].shift(1) if 'co_gt' in dd.columns else np.nan
+        dd['no2_lag1'] = dd['no2_gt'].shift(1) if 'no2_gt' in dd.columns else np.nan
+        hrs2 = dd.index.hour
+        dd['sin_hour'] = np.sin(2 * np.pi * hrs2 / 24)
+        dd['cos_hour'] = np.cos(2 * np.pi * hrs2 / 24)
+        dd = dd.reset_index()
+
+        # Anchors: same as LR
+        anchors = [last_time - pd.Timedelta(hours=(6 - k)) for k in range(1, 7)]
+        rows = []
+        for s in anchors:
+            xr = dd.loc[dd['datetime'] == s]
+            if xr.empty:
+                logger.error(f"XGB prediction failed - No data for anchor {s}")
+                return pd.DataFrame()
+            xr = xr[feats] if all(f in xr.columns for f in feats) else xr.reindex(columns=feats, fill_value=np.nan)
+            rows.append(xr)
+
+        X_feat = pd.concat(rows, axis=0)
+        if X_feat.isna().any().any():
+            logger.error("XGB prediction failed - NaN values in features")
+            return pd.DataFrame()
+
+        # Predict
+        y_hats = model.predict(X_feat)
+        future_times = pd.date_range(start=last_time + pd.Timedelta(hours=1), periods=6, freq='h')
+
+        result_df = pd.DataFrame({'datetime': future_times, 'xgb_pred': y_hats})
+
+        # Log success
+        execution_time = time.time() - start_time
+        logger.info(f"XGB prediction success - Generated {len(y_hats)} predictions, mean: {np.mean(y_hats):.2f}, time: {execution_time:.3f}s")
+
+        return result_df
+
+    except Exception as e:
+        execution_time = time.time() - start_time
+        logger.error(f"XGB prediction error - {str(e)}, time: {execution_time:.3f}s")
+        return pd.DataFrame()
+
 

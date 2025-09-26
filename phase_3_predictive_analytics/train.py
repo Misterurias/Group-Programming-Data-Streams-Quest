@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Simple training script for Phase 3 Predictive Analytics.
-Runs both Linear Regression and SARIMA model training.
+Runs Linear Regression, SARIMA, and XGBoost model training.
 """
 
 import os
@@ -60,6 +60,10 @@ def main():
         {
             'path': os.path.join(training_dir, 'train_sarima.py'),
             'name': 'SARIMA'
+        },
+        {
+            'path': os.path.join(training_dir, 'train_xgboost.py'),
+            'name': 'XGBoost'
         }
     ]
     

@@ -2,7 +2,9 @@
 kafka-python==2.2.15
 pandas
 numpy
-matplotlib==3.10.6
+# matplotlib==3.10.6
+matplotlib==3.9.2
+
 
 # Phase 2 Analytics Dependencies
 streamlit
